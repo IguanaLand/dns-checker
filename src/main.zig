@@ -54,7 +54,7 @@ pub fn main() !void {
     std.debug.print("Starting DNS checks with {d} threads...\n", .{cpu_count});
 
     var pool: std.Thread.Pool = undefined;
-    try pool.init(.{ .allocator = allocator, .n_jobs = cpu_count });
+    try pool.init(.{ .allocator = allocator, .stack_size = 128 * 1024, .n_jobs = cpu_count });
     defer pool.deinit();
 
     var wg: std.Thread.WaitGroup = .{};
