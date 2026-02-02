@@ -5,16 +5,13 @@
     .minimum_zig_version = "0.15.2",
     .dependencies = .{
         .zigdig = .{
-            .url = "git+https://github.com/IguanaLand/zigdig?ref=mater#2d6a8cbe54f83c87056f3536a4d5fa04a966aa72",
-            .hash = "zigdig-0.1.0-qdWbF3QKAgD5Qp2MB0FbfsvYzscLTuFv-mBUBSZH_wDl",
+            .url = "git+https://github.com/IguanaLand/zigdig?ref=mater#3910ecdf49b7965c867812fa8ae8e7430ed81022",
+            .hash = "zigdig-0.1.0-qdWbF8YoAgC4_TOdoKjzb0wgn8-lxzH0cU1X_hvgWJ5E",
         },
     },
     .paths = .{
         "build.zig",
         "build.zig.zon",
         "src",
-        // For example...
-        //"LICENSE",
-        //"README.md",
     },
 }

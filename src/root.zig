@@ -21,7 +21,7 @@ pub fn urlsInFile(allocator: std.mem.Allocator, filename: []const u8) ![]const [
     const file_data = try std.fs.cwd().readFileAlloc(allocator, filename, max_file_size);
     defer allocator.free(file_data);
 
-    var urls = std.ArrayList([]const u8){};
+    var urls: std.ArrayListUnmanaged([]const u8) = .{};
     errdefer {
         for (urls.items) |u| allocator.free(u);
         urls.deinit(allocator);

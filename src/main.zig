@@ -2,22 +2,10 @@ const std = @import("std");
 const dns_checker = @import("dns_checker");
 const dns = @import("dns");
 
-fn workerTask(url: []const u8, wg: *std.Thread.WaitGroup) void {
+fn workerTask(allocator: std.mem.Allocator, domain: []const u8, wg: *std.Thread.WaitGroup) void {
     defer wg.finish();
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{ .thread_safe = true }){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
-
-    std.debug.print("Found URL: {s}\n", .{url});
-
-    const domain = dns_checker.domainFromUrl(allocator, url) catch |err| {
-        std.debug.print("  Domain error: {s}\n", .{@errorName(err)});
-        return;
-    };
-    defer allocator.free(domain);
-
-    std.debug.print("  Domain: {s}\n", .{domain});
+    std.debug.print("Checking domain: {s}\n", .{domain});
 
     var addresses = dns.helpers.getAddressList(domain, 80, allocator) catch |err| {
         std.debug.print("  DNS error: {s}\n", .{@errorName(err)});
@@ -48,6 +36,32 @@ pub fn main() !void {
         allocator.free(urls);
     }
 
+    var domains: std.ArrayListUnmanaged([]const u8) = .{};
+    errdefer {
+        for (domains.items) |d| allocator.free(d);
+        domains.deinit(allocator);
+    }
+
+    {
+        var seen_domains: std.StringHashMapUnmanaged(void) = .{};
+        defer seen_domains.deinit(allocator);
+
+        for (urls) |url| {
+            const domain = dns_checker.domainFromUrl(allocator, url) catch |err| {
+                std.debug.print("Domain error for {s}: {s}\n", .{ url, @errorName(err) });
+                continue;
+            };
+
+            if (seen_domains.contains(domain)) {
+                allocator.free(domain);
+                continue;
+            }
+
+            try seen_domains.put(allocator, domain, {});
+            try domains.append(allocator, domain);
+        }
+    }
+
     const cpu_count = try std.Thread.getCpuCount();
     // const cpu_count = 1;
 
@@ -59,15 +73,18 @@ pub fn main() !void {
 
     var wg: std.Thread.WaitGroup = .{};
 
-    for (urls) |url| {
+    for (domains.items) |domain| {
         wg.start();
-        pool.spawn(workerTask, .{ url, &wg }) catch |err| {
+        pool.spawn(workerTask, .{ allocator, domain, &wg }) catch |err| {
             wg.finish();
             return err;
         };
     }
 
     wg.wait();
+
+    for (domains.items) |d| allocator.free(d);
+    domains.deinit(allocator);
 
     std.debug.print("All DNS checks complete.\n", .{});
 }
