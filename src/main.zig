@@ -20,12 +20,18 @@ pub fn main() !void {
     for (urls) |url| {
         std.debug.print("Found URL: {s}\n", .{url});
 
-        const domain = try dns_checker.domainFromUrl(allocator, url);
+        const domain = dns_checker.domainFromUrl(allocator, url) catch |err| {
+            std.debug.print("  Domain error: {s}\n", .{@errorName(err)});
+            continue;
+        };
         defer allocator.free(domain);
 
         std.debug.print("  Domain: {s}\n", .{domain});
 
-        var addresses = try dns.helpers.getAddressList(domain, 80, allocator);
+        var addresses = dns.helpers.getAddressList(domain, 80, allocator) catch |err| {
+            std.debug.print("  DNS error: {s}\n", .{@errorName(err)});
+            continue;
+        };
         defer addresses.deinit();
 
         for (addresses.addrs) |address| {
