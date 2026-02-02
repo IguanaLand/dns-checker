@@ -2,14 +2,46 @@ const std = @import("std");
 const dns_checker = @import("dns_checker");
 const dns = @import("dns");
 
+fn workerTask(url: []const u8, wg: *std.Thread.WaitGroup) void {
+    defer wg.finish();
+
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    std.debug.print("Found URL: {s}\n", .{url});
+
+    const domain = dns_checker.domainFromUrl(allocator, url) catch |err| {
+        std.debug.print("  Domain error: {s}\n", .{@errorName(err)});
+        return;
+    };
+
+    std.debug.print("  Domain: {s}\n", .{domain});
+
+    var addresses = dns.helpers.getAddressList(domain, 80, allocator) catch |err| {
+        std.debug.print("  DNS error: {s}\n", .{@errorName(err)});
+        return;
+    };
+    defer addresses.deinit();
+
+    for (addresses.addrs) |address| {
+        var buf: [128]u8 = undefined;
+        const rendered = std.fmt.bufPrint(&buf, "{f}", .{address}) catch |err| {
+            std.debug.print("    Address format error: {s}\n", .{@errorName(err)});
+            continue;
+        };
+        std.debug.print("    {s}\n", .{rendered});
+    }
+}
+
 pub fn main() !void {
     const filename = "urls.txt";
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.GeneralPurposeAllocator(.{ .thread_safe = true }){};
     defer {
         _ = gpa.deinit();
     }
-    var allocator = gpa.allocator();
+    const allocator = gpa.allocator();
 
     const urls = try dns_checker.urlsInFile(allocator, filename);
     defer {
@@ -17,29 +49,24 @@ pub fn main() !void {
         allocator.free(urls);
     }
 
+    // const cpu_count = try std.Thread.getCpuCount();
+    const cpu_count = 1;
+
+    std.debug.print("Starting DNS checks with {d} threads...\n", .{cpu_count});
+
+    var pool: std.Thread.Pool = undefined;
+    try pool.init(.{ .allocator = allocator, .n_jobs = cpu_count });
+    defer pool.deinit();
+
+    var wg: std.Thread.WaitGroup = .{};
+
     for (urls) |url| {
-        std.debug.print("Found URL: {s}\n", .{url});
-
-        const domain = dns_checker.domainFromUrl(allocator, url) catch |err| {
-            std.debug.print("  Domain error: {s}\n", .{@errorName(err)});
-            continue;
+        wg.start();
+        pool.spawn(workerTask, .{ url, &wg }) catch |err| {
+            wg.finish();
+            return err;
         };
-        defer allocator.free(domain);
-
-        std.debug.print("  Domain: {s}\n", .{domain});
-
-        var addresses = dns.helpers.getAddressList(domain, 80, allocator) catch |err| {
-            std.debug.print("  DNS error: {s}\n", .{@errorName(err)});
-            continue;
-        };
-        defer addresses.deinit();
-
-        for (addresses.addrs) |address| {
-            // Render the address in human‑readable form (e.g. 93.184.216.34:80 or [2606:2800:...]:80).
-            var buf: [128]u8 = undefined;
-            // Use {f} to invoke Address.format and avoid ambiguous placeholder.
-            const rendered = try std.fmt.bufPrint(&buf, "{f}", .{address});
-            std.debug.print("    {s}\n", .{rendered});
-        }
     }
+
+    wg.wait();
 }
