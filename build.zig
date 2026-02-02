@@ -1,12 +1,27 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) void {
+    const force_release = (b.option(bool, "release", "build in ReleaseSafe mode")) orelse false;
+    const force_debug = (b.option(bool, "debug", "build in Debug mode")) orelse false;
+    const strip_binaries = b.option(bool, "strip", "strip debug symbols from binaries");
     const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{});
+
+    if (force_release and force_debug) {
+        @panic("build options conflict: -Drelease and -Ddebug are mutually exclusive");
+    }
+
+    const optimize = if (force_release)
+        .ReleaseSafe
+    else if (force_debug)
+        .Debug
+    else
+        b.standardOptimizeOption(.{});
 
     const mod = b.addModule("dns_checker", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
+        .optimize = optimize,
+        .strip = strip_binaries,
     });
 
     const zigdig_dep = b.dependency("zigdig", .{
@@ -21,6 +36,7 @@ pub fn build(b: *std.Build) void {
 
             .target = target,
             .optimize = optimize,
+            .strip = strip_binaries,
 
             .imports = &.{
                 .{ .name = "dns_checker", .module = mod },
