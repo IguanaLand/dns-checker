@@ -5,8 +5,8 @@
     .minimum_zig_version = "0.15.2",
     .dependencies = .{
         .zigdig = .{
-            .url = "git+https://github.com/IguanaLand/zigdig?ref=master#1c540e834f5c1f3bd1cdedb736dc4977f69383c2",
-            .hash = "zigdig-0.1.0-qdWbF60HAgDun_Iq7QKUISV5Ixg2C8_CQfD6JcT9JdjS",
+            .url = "git+https://github.com/IguanaLand/zigdig?ref=mater#2d6a8cbe54f83c87056f3536a4d5fa04a966aa72",
+            .hash = "zigdig-0.1.0-qdWbF3QKAgD5Qp2MB0FbfsvYzscLTuFv-mBUBSZH_wDl",
         },
     },
     .paths = .{

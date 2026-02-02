@@ -5,9 +5,9 @@ const dns = @import("dns");
 fn workerTask(url: []const u8, wg: *std.Thread.WaitGroup) void {
     defer wg.finish();
 
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{ .thread_safe = true }){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
     std.debug.print("Found URL: {s}\n", .{url});
 
@@ -15,6 +15,7 @@ fn workerTask(url: []const u8, wg: *std.Thread.WaitGroup) void {
         std.debug.print("  Domain error: {s}\n", .{@errorName(err)});
         return;
     };
+    defer allocator.free(domain);
 
     std.debug.print("  Domain: {s}\n", .{domain});
 
@@ -38,9 +39,7 @@ pub fn main() !void {
     const filename = "urls.txt";
 
     var gpa = std.heap.GeneralPurposeAllocator(.{ .thread_safe = true }){};
-    defer {
-        _ = gpa.deinit();
-    }
+    defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const urls = try dns_checker.urlsInFile(allocator, filename);
@@ -49,8 +48,8 @@ pub fn main() !void {
         allocator.free(urls);
     }
 
-    // const cpu_count = try std.Thread.getCpuCount();
-    const cpu_count = 1;
+    const cpu_count = try std.Thread.getCpuCount();
+    // const cpu_count = 1;
 
     std.debug.print("Starting DNS checks with {d} threads...\n", .{cpu_count});
 
@@ -69,4 +68,6 @@ pub fn main() !void {
     }
 
     wg.wait();
+
+    std.debug.print("All DNS checks complete.\n", .{});
 }
