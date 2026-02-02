@@ -3,8 +3,15 @@ const std = @import("std");
 pub fn build(b: *std.Build) void {
     const force_release = (b.option(bool, "release", "build in ReleaseSafe mode")) orelse false;
     const force_debug = (b.option(bool, "debug", "build in Debug mode")) orelse false;
+    const force_valgrind = (b.option(bool, "valgrind", "use baseline CPU features for Valgrind")) orelse false;
     const strip_binaries = b.option(bool, "strip", "strip debug symbols from binaries");
-    const target = b.standardTargetOptions(.{});
+    var target_query = b.standardTargetOptionsQueryOnly(.{});
+    if (force_valgrind) {
+        target_query.cpu_model = .baseline;
+        target_query.cpu_features_add = .empty;
+        target_query.cpu_features_sub = .empty;
+    }
+    const target = b.resolveTargetQuery(target_query);
 
     if (force_release and force_debug) {
         @panic("build options conflict: -Drelease and -Ddebug are mutually exclusive");
